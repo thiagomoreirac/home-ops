@@ -1,8 +1,5 @@
 ---
 # Areas
-area/ansible:
-  - changed-files:
-      - any-glob-to-any-file: "ansible/**/*"
 area/docs:
   - changed-files:
       - any-glob-to-any-file:
@@ -14,13 +11,8 @@ area/github:
 area/kubernetes:
   - changed-files:
       - any-glob-to-any-file: "kubernetes/**/*"
-area/terraform:
+area/taskfile:
   - changed-files:
-      - any-glob-to-any-file: "terraform/**/*"
-# Clusters
-cluster/main:
-  - changed-files:
-      - any-glob-to-any-file: "kubernetes/main/**/*"
-cluster/storage:
-  - changed-files:
-      - any-glob-to-any-file: "kubernetes/storage/**/*"
+      - any-glob-to-any-file:
+          - ".taskfiles/**/*"
+          - "Taskfile.yaml"

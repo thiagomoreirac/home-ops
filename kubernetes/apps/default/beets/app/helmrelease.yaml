@@ -1,0 +1,112 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s/helm-charts/main/charts/other/app-template/schemas/helmrelease-helm-v2.schema.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: beets
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: app-template
+      version: 3.6.1
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  values:
+    controllers:
+      beets:
+        annotations:
+          reloader.stakater.com/auto: "true"
+        containers:
+          app:
+            image:
+              repository: ghcr.io/jee-r/beets
+              tag: latest@sha256:8518b3da72cf1191d2a1faa5358eb90034610ccbbf87024d7a85be88389af691
+            env:
+              BETANIN_HOST: 0.0.0.0
+              BETANIN_PORT: &port 80
+              MODE: betanin
+              TZ: America/New_York
+            probes:
+              liveness:
+                enabled: true
+              readiness:
+                enabled: true
+              startup:
+                enabled: true
+                spec:
+                  failureThreshold: 30
+                  periodSeconds: 10
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities: { drop: ["ALL"] }
+            resources:
+              requests:
+                cpu: 10m
+              limits:
+                memory: 1Gi
+    defaultPodOptions:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile: { type: RuntimeDefault }
+    service:
+      app:
+        controller: beets
+        ports:
+          http:
+            port: *port
+    ingress:
+      app:
+        className: internal
+        hosts:
+          - host: "{{ .Release.Name }}.devbu.io"
+            paths:
+              - path: /
+                service:
+                  identifier: app
+                  port: http
+    persistence:
+      config:
+        type: emptyDir
+      media:
+        type: nfs
+        server: expanse.internal
+        path: /mnt/eros/Media
+        advancedMounts:
+          beets:
+            app:
+              - path: /downloads
+                subPath: Downloads/soulseek/complete
+              - path: /tracks
+                subPath: Library/Tracks
+      config-file:
+        type: configMap
+        name: beets-configmap
+        globalMounts:
+          - path: /config/.config/beets/config.yaml
+            subPath: config.yaml
+            readOnly: true
+      secret-file:
+        type: secret
+        name: beets-secret
+        globalMounts:
+          - path: /config/.config/betanin/config.toml
+            subPath: config.toml
+            readOnly: true
+      tmp:
+        type: emptyDir

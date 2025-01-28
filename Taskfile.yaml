@@ -1,27 +1,35 @@
 ---
 # yaml-language-server: $schema=https://taskfile.dev/schema.json
-version: "3"
+version: '3'
+
+set: [pipefail]
+shopt: [globstar]
 
 vars:
-  ANSIBLE_DIR: "{{.ROOT_DIR}}/ansible"
-  KUBERNETES_DIR: "{{.ROOT_DIR}}/kubernetes"
+  CLUSTER_DIR: '{{.ROOT_DIR}}/kubernetes'
+  BOOTSTRAP_DIR: '{{.CLUSTER_DIR}}/bootstrap'
 
 env:
-  KUBECONFIG: "{{.KUBERNETES_DIR}}/kubernetes/main/kubeconfig:{{.KUBERNETES_DIR}}/kubernetes/storage/kubeconfig"
-  SOPS_AGE_KEY_FILE: "{{.ROOT_DIR}}/age.key"
+  KUBECONFIG: '{{.CLUSTER_DIR}}/kubeconfig'
+  MINIJINJA_CONFIG_FILE: '{{.ROOT_DIR}}/.minijinja.toml'
+  SOPS_AGE_KEY_FILE: '{{.ROOT_DIR}}/age.key'
+  TALOSCONFIG: '{{.CLUSTER_DIR}}/talosconfig'
 
 includes:
-  ansible: .taskfiles/Ansible/Taskfile.yaml
-  bootstrap: .taskfiles/Bootstrap/Taskfile.yaml
-  external-secrets: .taskfiles/ExternalSecrets/Taskfile.yaml
-  flux: .taskfiles/Flux/Taskfile.yaml
-  kubernetes: .taskfiles/Kubernetes/Taskfile.yaml
-  rook: .taskfiles/Rook/Taskfile.yaml
-  talos: .taskfiles/Talos/Taskfile.yaml
-  volsync: .taskfiles/VolSync/Taskfile.yaml
+  bootstrap: .taskfiles/bootstrap
+  kubernetes: .taskfiles/kubernetes
+  talos: .taskfiles/talos
+  volsync: .taskfiles/volsync
+  workstation: .taskfiles/workstation
 
 tasks:
 
   default:
+    cmd: task --list
     silent: true
-    cmd: task -l
+
+  # Ref: https://github.com/go-task/task/issues/608
+  noop:
+    internal: true
+    silent: true
+    cmd: noop() { :; }
