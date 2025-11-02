@@ -20,9 +20,9 @@ _... managed with Flux, Renovate, and GitHub Actions_ <img src="https://fonts.gs
 
 <div align="center">
 
-[![Home-Internet](https://img.shields.io/endpoint?url=https%3A%2F%2Fspoodermon.k13.dev%2Fapi%2Fv1%2Fendpoints%2F_ping%2Fhealth%2Fbadge.shields&style=for-the-badge&logo=ubiquiti&logoColor=white&label=Home%20Internet)](https://status.turbo.ac)&nbsp;&nbsp;
-[![Status-Page](https://img.shields.io/endpoint?url=https%3A%2F%2Fspoodermon.k13.dev%2Fapi%2Fv1%2Fendpoints%2F_status-page%2Fhealth%2Fbadge.shields&style=for-the-badge&logo=statuspage&logoColor=white&label=Status%20Page)](https://status.turbo.ac)&nbsp;&nbsp;
-[![Alertmanager](https://img.shields.io/endpoint?url=https%3A%2F%2Fspoodermon.k13.dev%2Fapi%2Fv1%2Fendpoints%2F_heartbeat%2Fhealth%2Fbadge.shields&style=for-the-badge&logo=prometheus&logoColor=white&label=Alertmanager)](https://status.turbo.ac)
+[![Home-Internet](https://img.shields.io/endpoint?url=https%3A%2F%2Fstatus.k13.dev%2Fapi%2Fv1%2Fendpoints%2Fbuddy_ping%2Fhealth%2Fbadge.shields&style=for-the-badge&logo=ubiquiti&logoColor=white&label=Home%20Internet)](https://status.turbo.ac)&nbsp;&nbsp;
+[![Status-Page](https://img.shields.io/endpoint?url=https%3A%2F%2Fstatus.k13.dev%2Fapi%2Fv1%2Fendpoints%2Fbuddy_status-page%2Fhealth%2Fbadge.shields&style=for-the-badge&logo=statuspage&logoColor=white&label=Status%20Page)](https://status.turbo.ac)&nbsp;&nbsp;
+[![Alertmanager](https://img.shields.io/endpoint?url=https%3A%2F%2Fstatus.k13.dev%2Fapi%2Fv1%2Fendpoints%2Fbuddy_heartbeat%2Fhealth%2Fbadge.shields&style=for-the-badge&logo=prometheus&logoColor=white&label=Alertmanager)](https://status.turbo.ac)
 
 </div>
 
@@ -138,10 +138,8 @@ In my cluster there are two instances of [ExternalDNS](https://github.com/kubern
 |-----------------------------|-----|--------------|---------------------------------|------|---------------|-------------------------|
 | ASUS NUC 14 Pro CU 5 125H   | 3   | 1TB SSD      | 1TB (local) / 800GB (rook-ceph) | 96GB | Talos         | Kubernetes              |
 | Dell PowerEdge T340         | 1   | 1TB SSD      | 8x22TB ZFS (mirrored vdevs)     | 64GB | TrueNAS SCALE | NFS + Backup Server     |
-| PiKVM (RasPi 4)             | 1   | 64GB (SD)    | -                               | 4GB  | PiKVM         | KVM                     |
-| TESmart 8 Port KVM Switch   | 1   | -            | -                               | -    | -             | Network KVM (for PiKVM) |
+| JetKVM                      | 3   | -            | -                               | -    | -             | KVM for Kubernetes      |
 | UniFi UDMP Max              | 1   | -            | 2x4TB HDD                       | -    | -             | Router & NVR            |
-| UniFi US-16-XG              | 1   | -            | -                               | -    | -             | 10Gb Core Switch        |
 | UniFi USW-Enterprise-24-PoE | 1   | -            | -                               | -    | -             | 2.5Gb PoE Switch        |
 | UniFi USP PDU Pro           | 1   | -            | -                               | -    | -             | PDU                     |
 | APC SMT1500RM2U             | 1   | -            | -                               | -    | -             | UPS                     |

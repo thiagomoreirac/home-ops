@@ -5,28 +5,19 @@ kind: HelmRelease
 metadata:
   name: go2rtc
 spec:
-  interval: 1h
   chartRef:
     kind: OCIRepository
     name: go2rtc
-  install:
-    remediation:
-      retries: -1
-  upgrade:
-    cleanupOnFail: true
-    remediation:
-      retries: 3
+  interval: 1h
   values:
     controllers:
       go2rtc:
         strategy: RollingUpdate
-        annotations:
-          reloader.stakater.com/auto: "true"
         containers:
           app:
             image:
               repository: ghcr.io/alexxit/go2rtc
-              tag: 1.9.9@sha256:7d31dcb73633310e80497c431f4534c81ed55ec0708db3262bc56918e654bba5
+              tag: 1.9.11@sha256:64ab39fdcf7571075f4ef1a818a1019aa359e2e730600771d265b50a94449532
             probes:
               liveness: &probes
                 enabled: true
@@ -64,7 +55,8 @@ spec:
       streams:
         type: LoadBalancer
         annotations:
-          lbipam.cilium.io/ips: 192.168.42.124
+          lbipam.cilium.io/ips: 192.168.69.124
+        externalTrafficPolicy: Local
         ports:
           streams-rtsp:
             port: 554
@@ -81,16 +73,40 @@ spec:
         parentRefs:
           - name: envoy-internal
             namespace: network
-            sectionName: https
         rules:
           - backendRefs:
               - identifier: app
                 port: *port
+    configMaps:
+      config:
+        data:
+          go2rtc.yaml: |-
+            log:
+              streams: error # Prevent log spam from UniFi Protect
+            api:
+              listen: :80
+              origin: "*"
+            rtsp:
+              listen: :554
+            webrtc:
+              listen: :8555
+              candidates:
+                - 192.168.69.124:8555
+                - stun:8555
+              ice_servers:
+                - urls:
+                    - stun:stun.cloudflare.com:3478
+            streams:
+              driveway:
+                - rtspx://192.168.1.1:7441/SB74mRIu1CkoPcEq
+              garage:
+                - rtspx://192.168.1.1:7441/dFl352XtCUFREtRz
+              porch:
+                - rtspx://192.168.1.1:7441/ezkTDbaOR71GUE67
     persistence:
       config-file:
         type: configMap
-        name: go2rtc-configmap
+        identifier: config
         globalMounts:
           - path: /config/go2rtc.yaml
             subPath: go2rtc.yaml
-            readOnly: true

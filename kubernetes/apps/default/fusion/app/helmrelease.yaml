@@ -5,17 +5,10 @@ kind: HelmRelease
 metadata:
   name: fusion
 spec:
-  interval: 1h
   chartRef:
     kind: OCIRepository
     name: fusion
-  install:
-    remediation:
-      retries: -1
-  upgrade:
-    cleanupOnFail: true
-    remediation:
-      retries: 3
+  interval: 1h
   values:
     controllers:
       fusion:
@@ -68,9 +61,6 @@ spec:
         parentRefs:
           - name: envoy-internal
             namespace: network
-            sectionName: https
     persistence:
-      config:
+      data:
         existingClaim: "{{ .Release.Name }}"
-        globalMounts:
-          - path: /data

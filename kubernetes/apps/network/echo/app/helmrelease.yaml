@@ -5,17 +5,10 @@ kind: HelmRelease
 metadata:
   name: echo
 spec:
-  interval: 1h
   chartRef:
     kind: OCIRepository
     name: echo
-  install:
-    remediation:
-      retries: -1
-  upgrade:
-    cleanupOnFail: true
-    remediation:
-      retries: 3
+  interval: 1h
   values:
     controllers:
       echo:
@@ -24,7 +17,7 @@ spec:
           app:
             image:
               repository: ghcr.io/mendhak/http-https-echo
-              tag: 37
+              tag: 38
             env:
               HTTP_PORT: &port 80
               LOG_WITHOUT_NEWLINE: true
@@ -68,9 +61,11 @@ spec:
           - port: http
     route:
       app:
+        annotations:
+          gatus.home-operations.com/endpoint: |-
+            conditions: ["[STATUS] == 200"]
         hostnames:
           - "{{ .Release.Name }}.turbo.ac"
         parentRefs:
           - name: envoy-external
             namespace: network
-            sectionName: https

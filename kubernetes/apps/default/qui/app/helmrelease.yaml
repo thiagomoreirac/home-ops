@@ -5,17 +5,10 @@ kind: HelmRelease
 metadata:
   name: qui
 spec:
-  interval: 1h
   chartRef:
     kind: OCIRepository
     name: qui
-  install:
-    remediation:
-      retries: -1
-  upgrade:
-    cleanupOnFail: true
-    remediation:
-      retries: 3
+  interval: 1h
   values:
     controllers:
       qui:
@@ -25,7 +18,7 @@ spec:
           app:
             image:
               repository: ghcr.io/autobrr/qui
-              tag: v0.3.0@sha256:a347580c19e8569b9398502cb8a5e6a6726c360915d028b32b50e17350fb168e
+              tag: v1.6.1@sha256:331a5c8f5b3efc1fb76b3aa61abe2c24b953846780cdc78990146c3c7eec4304
             env:
               QUI__HOST: 0.0.0.0
               QUI__PORT: &port 80
@@ -75,7 +68,6 @@ spec:
         parentRefs:
           - name: envoy-internal
             namespace: network
-            sectionName: https
     persistence:
       config:
         existingClaim: "{{ .Release.Name }}"

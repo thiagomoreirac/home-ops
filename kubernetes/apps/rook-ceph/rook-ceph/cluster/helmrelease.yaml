@@ -5,18 +5,10 @@ kind: HelmRelease
 metadata:
   name: rook-ceph-cluster
 spec:
-  interval: 1h
-  timeout: 15m
   chartRef:
     kind: OCIRepository
     name: rook-ceph-cluster
-  install:
-    remediation:
-      retries: -1
-  upgrade:
-    cleanupOnFail: true
-    remediation:
-      retries: 3
+  interval: 1h
   values:
     monitoring:
       enabled: true
@@ -32,7 +24,6 @@ spec:
         parentRefs:
           - name: envoy-internal
             namespace: network
-            sectionName: https
     cephClusterSpec:
       cephConfig:
         global:
@@ -64,8 +55,17 @@ spec:
             enabled: true
       network:
         provider: host
+        addressRanges:
+          public:
+            - 169.254.255.0/24
+          cluster:
+            - 169.254.255.0/24
         connections:
           requireMsgr2: true
+      resources:
+        osd:
+          limits:
+            memory: 8Gi
       storage:
         useAllNodes: true
         useAllDevices: false

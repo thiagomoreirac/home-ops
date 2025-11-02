@@ -3,9 +3,12 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: default
+
 components:
-  - ../../components/common
+  - ../../components/alerts
+
 resources:
+  - ./namespace.yaml
   - ./atuin/ks.yaml
   - ./autobrr/ks.yaml
   - ./bazarr/ks.yaml
@@ -13,9 +16,9 @@ resources:
   - ./fusion/ks.yaml
   - ./go2rtc/ks.yaml
   - ./home-assistant/ks.yaml
-  - ./jellyfin/ks.yaml
   - ./jellyseerr/ks.yaml
   - ./mosquitto/ks.yaml
+  - ./notifier/ks.yaml
   - ./nzbget/ks.yaml
   - ./plex/ks.yaml
   - ./prowlarr/ks.yaml
@@ -24,10 +27,10 @@ resources:
   - ./radarr/ks.yaml
   - ./recyclarr/ks.yaml
   - ./slskd/ks.yaml
+  - ./smtp-relay/ks.yaml
   - ./sonarr/ks.yaml
   - ./tautulli/ks.yaml
   - ./thelounge/ks.yaml
   - ./tqm/ks.yaml
-  - ./webhook/ks.yaml
   - ./zigbee/ks.yaml
   - ./zwave/ks.yaml

@@ -5,17 +5,10 @@ kind: HelmRelease
 metadata:
   name: jellyseerr
 spec:
-  interval: 1h
   chartRef:
     kind: OCIRepository
     name: jellyseerr
-  install:
-    remediation:
-      retries: -1
-  upgrade:
-    cleanupOnFail: true
-    remediation:
-      retries: 3
+  interval: 1h
   values:
     controllers:
       jellyseerr:
@@ -69,28 +62,19 @@ spec:
             port: *port
     route:
       app:
+        annotations:
+          gatus.home-operations.com/endpoint: |-
+            conditions: ["[STATUS] == 200"]
         hostnames:
           - "{{ .Release.Name }}.turbo.ac"
           - requests.turbo.ac
         parentRefs:
           - name: envoy-external
             namespace: network
-            sectionName: https
     persistence:
       config:
         existingClaim: "{{ .Release.Name }}"
         globalMounts:
           - path: /app/config
-      config-cache:
-        existingClaim: "{{ .Release.Name }}-cache"
-        globalMounts:
-          - path: /app/config/cache
-      tmpfs:
+      tmp:
         type: emptyDir
-        advancedMounts:
-          jellyseerr:
-            app:
-              - path: /app/config/logs
-                subPath: logs
-              - path: /tmp
-                subPath: tmp

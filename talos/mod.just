@@ -21,10 +21,6 @@ download-image version schematic:
         "https://factory.talos.dev/image/{{ schematic }}/{{ version }}/metal-amd64.iso"
     just log info "Downloaded Talos" version "{{ version }}" schematic "{{ schematic }}"
 
-[doc('Generate kubeconfig for Talos cluster')]
-gen-kubeconfig:
-    talosctl kubeconfig -n "{{ controller }}" -f --force-context-name main {{ justfile_dir() }}
-
 [doc('Generate schematic ID from Talos schematic')]
 gen-schematic-id:
     curl -sX POST --data-binary @<(just template "{{ talos_dir }}/schematic.yaml.j2") "https://factory.talos.dev/schematics" | jq -r '.id'
@@ -41,22 +37,22 @@ render-config node:
         -p @<(just template "{{ talos_dir }}/nodes/{{ node }}.yaml.j2")
 
 [doc('Reset a node')]
-reset-node node:
+reset-node node *args:
     gum confirm "Reset node {{ node }}?" --default="No" && \
-        talosctl -n "{{ node }}" reset --graceful=false || exit 0
+        talosctl -n "{{ node }}" reset --system-labels-to-wipe STATE --system-labels-to-wipe EPHEMERAL --system-labels-to-wipe u-local-hostpath --graceful=false {{ args }} || exit 0
 
 [doc('Shutdown a node')]
-shutdown-node node:
+shutdown-node node *args:
     gum confirm "Shutdown node {{ node }}?" --default="No" && \
-        talosctl -n "{{ node }}" shutdown --force || exit 0
+        talosctl -n "{{ node }}" shutdown --force {{ args }} || exit 0
 
 [doc('Upgrade Kubernetes version on the cluster')]
 upgrade-k8s version:
     talosctl -n "{{ controller }}" upgrade-k8s --to {{ version }}
 
 [doc('Upgrade Talos version on a node')]
-upgrade-node node:
-    talosctl -n "{{ node }}" upgrade -i "$(just talos machine-image)" -m powercycle --timeout=10m
+upgrade-node node *args:
+    talosctl -n "{{ node }}" upgrade -i "$(just talos machine-image)" -m powercycle --timeout=10m {{ args }}
 
 [private]
 machine-controller node:

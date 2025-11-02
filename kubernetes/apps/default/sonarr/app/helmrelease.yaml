@@ -5,17 +5,10 @@ kind: HelmRelease
 metadata:
   name: sonarr
 spec:
-  interval: 1h
   chartRef:
     kind: OCIRepository
     name: sonarr
-  install:
-    remediation:
-      retries: -1
-  upgrade:
-    cleanupOnFail: true
-    remediation:
-      retries: 3
+  interval: 1h
   values:
     controllers:
       sonarr:
@@ -25,7 +18,7 @@ spec:
           app:
             image:
               repository: ghcr.io/home-operations/sonarr
-              tag: 4.0.15.2940@sha256:ca6c735014bdfb04ce043bf1323a068ab1d1228eea5bab8305ca0722df7baf78
+              tag: 4.0.16.2942@sha256:a986ef3682f1b94e2832a31ace57057279bd4ffdf49190a1b5f9f8d3cef875f5
             env:
               SONARR__APP__INSTANCENAME: Sonarr
               SONARR__APP__THEME: dark
@@ -80,14 +73,15 @@ spec:
         parentRefs:
           - name: envoy-internal
             namespace: network
-            sectionName: https
     persistence:
       config:
         existingClaim: "{{ .Release.Name }}"
-      config-cache:
-        existingClaim: "{{ .Release.Name }}-cache"
+      scripts:
+        type: configMap
+        name: sonarr-configmap
+        defaultMode: 0775
         globalMounts:
-          - path: /config/MediaCover
+          - readOnly: true
       media:
         type: nfs
         server: expanse.internal

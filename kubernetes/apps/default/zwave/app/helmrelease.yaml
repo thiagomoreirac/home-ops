@@ -5,17 +5,10 @@ kind: HelmRelease
 metadata:
   name: zwave
 spec:
-  interval: 1h
   chartRef:
     kind: OCIRepository
     name: zwave
-  install:
-    remediation:
-      retries: -1
-  upgrade:
-    cleanupOnFail: true
-    remediation:
-      retries: 3
+  interval: 1h
   values:
     controllers:
       zwave:
@@ -23,7 +16,7 @@ spec:
           app:
             image:
               repository: ghcr.io/zwave-js/zwave-js-ui
-              tag: 11.2.1@sha256:7fc0a78a6c843654eb93166decd13192b5a1f53637cf117ea13569f2a33a0e94
+              tag: 11.6.1@sha256:8cc2c1868129f9b8e3ffbd695b50668b845d8eb63e9c159b94cddca2e6d96e09
             env:
               TZ: America/New_York
               PORT: &port 80
@@ -61,15 +54,10 @@ spec:
         parentRefs:
           - name: envoy-internal
             namespace: network
-            sectionName: https
     persistence:
       config:
         existingClaim: "{{ .Release.Name }}"
         globalMounts:
           - path: /usr/src/app/store
-      config-cache:
-        existingClaim: "{{ .Release.Name }}-cache"
-        globalMounts:
-          - path: /usr/src/app/store/.config-db
       tmp:
         type: emptyDir

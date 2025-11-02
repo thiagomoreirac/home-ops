@@ -5,17 +5,10 @@ kind: HelmRelease
 metadata:
   name: plex
 spec:
-  interval: 1h
   chartRef:
     kind: OCIRepository
     name: plex
-  install:
-    remediation:
-      retries: -1
-  upgrade:
-    cleanupOnFail: true
-    remediation:
-      retries: 3
+  interval: 1h
   values:
     controllers:
       plex:
@@ -25,10 +18,10 @@ spec:
           app:
             image:
               repository: ghcr.io/home-operations/plex
-              tag: 1.42.1.10060@sha256:04563be281364ba2462285aacb2ca13d7ef7e1d0b19e1203f4c19b4a56840c5c
+              tag: 1.42.2.10156@sha256:9ad8a3506e1d8ebda873a668603c1a2c10e6887969564561be669efd65ae8871
             env:
               TZ: America/New_York
-              PLEX_ADVERTISE_URL: https://plex.turbo.ac:443,http://192.168.42.128:32400
+              PLEX_ADVERTISE_URL: https://plex.turbo.ac:443,http://192.168.69.128:32400,http://plex.default.svc.cluster.local:32400
               PLEX_NO_AUTH_NETWORKS: 192.168.10.0/24
             probes:
               liveness: &probes
@@ -53,12 +46,16 @@ spec:
               readOnlyRootFilesystem: true
               capabilities: {drop: ["ALL"]}
             resources:
+              claims:
+                - name: gpu
               requests:
                 cpu: 100m
               limits:
-                gpu.intel.com/i915: 1
                 memory: 16Gi
     defaultPodOptions:
+      resourceClaims:
+        - name: gpu
+          resourceClaimTemplateName: plex
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
@@ -69,20 +66,24 @@ spec:
       app:
         type: LoadBalancer
         annotations:
-          lbipam.cilium.io/ips: 192.168.42.128
+          lbipam.cilium.io/ips: 192.168.69.128
+        externalTrafficPolicy: Local
         ports:
           http:
             port: *port
     route:
       app:
+        annotations:
+          gatus.home-operations.com/endpoint: |-
+            conditions: ["[STATUS] == 401"]
         hostnames:
           - "{{ .Release.Name }}.turbo.ac"
         parentRefs:
           - name: envoy-external
             namespace: network
-            sectionName: https
         rules:
-          - backendRefs:
+          - # Ref: https://forums.plex.tv/t/external-srt-subtitles-are-not-working-w-reverse-proxy/886540
+            backendRefs:
               - identifier: app
                 port: *port
             filters:
@@ -100,10 +101,6 @@ spec:
     persistence:
       config:
         existingClaim: "{{ .Release.Name }}"
-      config-cache:
-        existingClaim: "{{ .Release.Name }}-cache"
-        globalMounts:
-          - path: /config/Library/Application Support/Plex Media Server/Cache
       media:
         type: nfs
         server: expanse.internal
@@ -111,14 +108,5 @@ spec:
         globalMounts:
           - path: /media
             readOnly: true
-      tmpfs:
+      tmp:
         type: emptyDir
-        advancedMounts:
-          plex:
-            app:
-              - path: /config/Library/Application Support/Plex Media Server/Logs
-                subPath: logs
-              - path: /transcode
-                subPath: transcode
-              - path: /tmp
-                subPath: tmp
