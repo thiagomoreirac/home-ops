@@ -3,24 +3,60 @@ area/bootstrap:
   - changed-files:
       - any-glob-to-any-file:
           - bootstrap/**/*
+<<<<<<< HEAD
 
+=======
+area/docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - README.md
+>>>>>>> other-repo/main
 area/github:
   - changed-files:
       - any-glob-to-any-file:
           - .github/**/*
+<<<<<<< HEAD
 
+=======
+>>>>>>> other-repo/main
 area/kubernetes:
   - changed-files:
       - any-glob-to-any-file:
           - kubernetes/**/*
+<<<<<<< HEAD
 
+=======
+area/mise:
+  - changed-files:
+      - any-glob-to-any-file:
+          - .mise.toml
+>>>>>>> other-repo/main
 area/renovate:
   - changed-files:
       - any-glob-to-any-file:
           - .renovate/**/*
           - .renovaterc.json5
+<<<<<<< HEAD
 
+=======
+area/scripts:
+  - changed-files:
+      - any-glob-to-any-file:
+          - scripts/**/*
+>>>>>>> other-repo/main
 area/talos:
   - changed-files:
       - any-glob-to-any-file:
           - talos/**/*
+<<<<<<< HEAD
+=======
+area/taskfile:
+  - changed-files:
+      - any-glob-to-any-file:
+          - .taskfiles/**/*
+          - Taskfile.yaml
+area/templates:
+  - changed-files:
+      - any-glob-to-any-file:
+          - templates/**/*
+>>>>>>> other-repo/main

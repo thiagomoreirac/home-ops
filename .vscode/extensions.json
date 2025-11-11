@@ -1,9 +1,14 @@
 {
   "recommendations": [
+<<<<<<< HEAD
     "bluebrown.yamlfmt",
     "blueglassblock.better-json5",
     "irongeek.vscode-env",
     "PKief.material-icon-theme",
+=======
+    "blueglassblock.better-json5",
+    "irongeek.vscode-env",
+>>>>>>> other-repo/main
     "redhat.vscode-yaml",
     "signageos.signageos-vscode-sops"
   ]

@@ -2,8 +2,11 @@
 *.env linguist-detectable linguist-language=SHELL
 *.json linguist-detectable linguist-language=JSON
 *.json5 linguist-detectable linguist-language=JSON5
+<<<<<<< HEAD
 *.just linguist-detectable linguist-language=JUST
 *.justfile linguist-detectable linguist-language=JUST
+=======
+>>>>>>> other-repo/main
 *.md linguist-detectable linguist-language=MARKDOWN
 *.sh linguist-detectable linguist-language=SHELL
 *.toml linguist-detectable linguist-language=TOML
