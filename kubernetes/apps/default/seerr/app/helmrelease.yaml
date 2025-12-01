@@ -3,30 +3,36 @@
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
-  name: fusion
+  name: seerr
 spec:
   chartRef:
     kind: OCIRepository
-    name: fusion
+    name: seerr
   interval: 1h
   values:
     controllers:
-      fusion:
+      seerr:
+        annotations:
+          reloader.stakater.com/auto: "true"
         containers:
           app:
             image:
-              repository: ghcr.io/0x2e/fusion
-              tag: 0.9.8@sha256:2d98a5bf0cabd6998d07fa26c63f1b742a1c33a4c926f2da1dfd7ee49e88e3e0
+              repository: ghcr.io/seerr-team/seerr
+              tag: develop@sha256:73f706df12f89472e953e9bd90d4bd6d9f1437b4ce4cb4cb693561420ab70448
             env:
-              PORT: &port 80
               TZ: America/New_York
+              LOG_LEVEL: "info"
+              PORT: &port 80
+            envFrom:
+              - secretRef:
+                  name: "{{ .Release.Name }}-secret"
             probes:
               liveness: &probes
                 enabled: true
                 custom: true
                 spec:
                   httpGet:
-                    path: /
+                    path: /api/v1/status
                     port: *port
                   initialDelaySeconds: 0
                   periodSeconds: 10
@@ -39,9 +45,9 @@ spec:
               capabilities: {drop: ["ALL"]}
             resources:
               requests:
-                cpu: 100m
+                cpu: 10m
               limits:
-                memory: 512Mi
+                memory: 2Gi
     defaultPodOptions:
       securityContext:
         runAsNonRoot: true
@@ -56,11 +62,19 @@ spec:
             port: *port
     route:
       app:
+        annotations:
+          gatus.home-operations.com/endpoint: |-
+            conditions: ["[STATUS] == 200"]
         hostnames:
           - "{{ .Release.Name }}.turbo.ac"
+          - requests.turbo.ac
         parentRefs:
-          - name: envoy-internal
+          - name: envoy-external
             namespace: network
     persistence:
-      data:
+      config:
         existingClaim: "{{ .Release.Name }}"
+        globalMounts:
+          - path: /app/config
+      tmp:
+        type: emptyDir
