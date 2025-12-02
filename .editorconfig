@@ -10,22 +10,13 @@ charset = utf-8
 trim_trailing_whitespace = true
 insert_final_newline = true
 
-<<<<<<< HEAD
-=======
 [*.cue]
 indent_style = tab
 indent_size = 4
 
->>>>>>> other-repo/main
 [*.md]
 indent_size = 4
 trim_trailing_whitespace = false
 
 [*.sh]
 indent_size = 4
-<<<<<<< HEAD
-
-[{*.just,*.justfile}]
-indent_size = 4
-=======
->>>>>>> other-repo/main

@@ -1,21 +1,4 @@
 [env]
-<<<<<<< HEAD
-KUBECONFIG = "{{config_root}}/kubeconfig"
-MINIJINJA_CONFIG_FILE = "{{config_root}}/.minijinja.toml"
-SOPS_AGE_KEY_FILE = "{{config_root}}/age.key"
-TALOSCONFIG = "{{config_root}}/talosconfig"
-JUST_UNSTABLE = "1"
-LEFTHOOK_OUTPUT = "false"
-
-_.file = [
-  "{{config_root}}/.secrets.env",
-]
-
-[tools]
-"aqua:helm/helm" = "3.19.2"
-"uv" = "latest"
-"pipx:flux-local" = "latest"
-=======
 _.python.venv = { path = "{{config_root}}/.venv", create = true }
 KUBECONFIG = "{{config_root}}/kubeconfig"
 SOPS_AGE_KEY_FILE = "{{config_root}}/age.key"
@@ -41,4 +24,3 @@ TALOSCONFIG = "{{config_root}}/talos/clusterconfig/talosconfig"
 "aqua:mikefarah/yq" = "4.48.1"
 "aqua:siderolabs/talos" = "1.11.5"
 "aqua:yannh/kubeconform" = "0.7.0"
->>>>>>> other-repo/main
