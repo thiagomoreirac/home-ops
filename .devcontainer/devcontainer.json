@@ -6,7 +6,8 @@
     "ghcr.io/devcontainers/features/python:1": {
       "version": "3.14"
     },
-    "ghcr.io/devcontainers/features/git-lfs:1": {}
+    "ghcr.io/devcontainers/features/git-lfs:1": {},
+    "ghcr.io/devcontainers/features/azure-cli:1": {}
   },
   "postCreateCommand": "bash .devcontainer/setup.sh",
   "customizations": {
