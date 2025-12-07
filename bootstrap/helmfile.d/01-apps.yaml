@@ -44,14 +44,14 @@ releases:
     needs:
       - cert-manager/cert-manager
 
-  - name: onepassword
-    namespace: external-secrets
-    chart: oci://ghcr.io/bjw-s-labs/helm/app-template
-    version: 4.5.0
+  - name: azure-keyvault-csi
+    namespace: kube-system
+    chart: oci://mcr.microsoft.com/azure-security/k8s-extensions/charts/keyvault
+    version: 1.4.0
     values:
       - ./templates/values.yaml.gotmpl
     hooks:
-      - # Wait for ExternalSecrets CRDs to be available
+      - # Wait for external-secrets CRDs
         command: bash
         args:
           - -c
@@ -59,13 +59,13 @@ releases:
         events:
           - postsync
         showlogs: true
-      - # Apply ExternalSecret Resources
+      - # Apply Azure Key Vault SecretStore and ExternalSecrets
         command: kubectl
         args:
           - apply
           - --server-side
           - --field-manager=kustomize-controller
-          - --filename=../../kubernetes/apps/external-secrets/onepassword/app/clustersecretstore.yaml
+          - --filename=../../kubernetes/apps/azure-keyvault-csi/clustersecretstore.yaml
         events:
           - postsync
         showlogs: true

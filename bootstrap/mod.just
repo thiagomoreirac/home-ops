@@ -8,7 +8,14 @@ controller := `talosctl config info -o yaml | yq -e '.endpoints[0]'`
 nodes := `talosctl config info -o yaml | yq -e '.nodes | join (" ")'`
 
 [private]
-default: talos kube (kubeconfig "node") wait namespaces resources crds apps kubeconfig
+default: talos kube (kubeconfig "node") wait azure-arc namespaces resources crds apps kubeconfig
+
+[doc('Install Azure Arc')]
+azure-arc:
+    just log info "Running stage..." "stage" "$0"
+    if ! bash "{{ justfile_dir() }}/scripts/bootstrap-azure-arc.sh" --resource-group "{{ env('AZURE_RESOURCE_GROUP', 'homelab') }}" --cluster-name "{{ env('CLUSTER_NAME', 'homelab-k8s') }}" --talos; then \
+        just log fatal "Failed to bootstrap Azure Arc" "stage" "$0"; \
+    fi
 
 [doc('Install Talos')]
 talos:

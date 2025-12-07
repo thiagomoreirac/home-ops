@@ -11,10 +11,11 @@ SUBSCRIPTION=""
 UPLOAD=0
 UPLOAD_ONLY=0
 FORCE=0
+AZURE_SETUP=0
 
 usage() {
   cat <<EOF
-Usage: $0 --vault VAULT_NAME [--fetch-only] [--upload] [--force]
+Usage: $0 --vault VAULT_NAME [--fetch-only] [--upload] [--force] [--azure-setup]
 
 Options:
   --vault NAME     Name of the existing Azure Key Vault to use (required).
@@ -23,6 +24,7 @@ Options:
   --force          Overwrite local files even if they exist.
   --vault-rg NAME   (optional) Resource group containing the Key Vault.
   --subscription ID (optional) Azure subscription id to target the Key Vault.
+  --azure-setup    Configure Azure Arc prerequisites (setup managed identity, assign roles).
   --help           Show this help.
 
 This script will fetch the following secrets from Key Vault (if present):
@@ -36,6 +38,7 @@ This script will fetch the following secrets from Key Vault (if present):
   - nodes-yaml               -> ./nodes.yaml
 
 Use --upload to push existing local files to Key Vault using the secret names above.
+Use --azure-setup to configure Azure Arc and managed identities (requires admin permissions).
 EOF
 }
 
@@ -47,6 +50,7 @@ while [ "$#" -gt 0 ]; do
     --upload) UPLOAD=1; shift;;
     --upload-only) UPLOAD_ONLY=1; shift;;
     --force) FORCE=1; shift;;
+    --azure-setup) AZURE_SETUP=1; shift;;
     --help) usage; exit 0;;
     *) echo "Unknown arg: $1" >&2; usage; exit 1;;
   esac
@@ -145,6 +149,76 @@ upload_secret() {
   echo "Uploaded $name"
 }
 
+setup_azure_prerequisites() {
+  echo "Setting up Azure prerequisites for Arc and Key Vault CSI Driver..."
+
+  # Get subscription ID
+  local sub_id
+  sub_id=$(az account show --query id -o tsv)
+  echo "Using subscription: $sub_id"
+
+  # Create Managed Identity for external-secrets
+  local mi_name="external-secrets-mi"
+  echo "Creating Managed Identity: $mi_name..."
+
+  if az identity show --name "$mi_name" --resource-group "$VAULT_RG" >/dev/null 2>&1; then
+    echo "Managed Identity '$mi_name' already exists"
+  else
+    az identity create \
+      --name "$mi_name" \
+      --resource-group "$VAULT_RG" \
+      --location "${AZURE_LOCATION:-eastus}"
+    echo "Created Managed Identity: $mi_name"
+  fi
+
+  # Get Managed Identity details
+  local mi_id
+  local mi_client_id
+  mi_id=$(az identity show --name "$mi_name" --resource-group "$VAULT_RG" --query id -o tsv)
+  mi_client_id=$(az identity show --name "$mi_name" --resource-group "$VAULT_RG" --query clientId -o tsv)
+
+  echo "Managed Identity ID: $mi_id"
+  echo "Client ID: $mi_client_id"
+
+  # Get Key Vault resource ID
+  local kv_id
+  kv_id=$(az keyvault show --name "$VAULT" --resource-group "$VAULT_RG" --query id -o tsv)
+  echo "Key Vault ID: $kv_id"
+
+  # Assign Key Vault Secrets Officer role to the Managed Identity
+  echo "Assigning 'Key Vault Secrets Officer' role to Managed Identity..."
+  az role assignment create \
+    --assignee "$mi_client_id" \
+    --role "Key Vault Secrets Officer" \
+    --scope "$kv_id" || echo "Role assignment may have already been created"
+
+  # Store the managed identity details for cluster configuration
+  cat > "${PWD}/.azure-arc-config" << EOF
+AZURE_RESOURCE_GROUP="$VAULT_RG"
+AZURE_SUBSCRIPTION_ID="$sub_id"
+AZURE_KEYVAULT_NAME="$VAULT"
+AZURE_MANAGED_IDENTITY_NAME="$mi_name"
+AZURE_MANAGED_IDENTITY_CLIENT_ID="$mi_client_id"
+EOF
+
+  echo "Azure prerequisites setup complete!"
+  echo "Configuration saved to: ${PWD}/.azure-arc-config"
+}
+
+upload_secret() {
+  local name="$1"
+  local src="$2"
+
+  if [ ! -f "$src" ]; then
+    echo "Local file $src not found, skipping upload for $name"
+    return 1
+  fi
+  echo "Uploading local $src to vault '$VAULT' as secret '$name'..."
+  # Use az to set secret; multiline values are supported
+  az keyvault secret set --vault-name "$VAULT" --name "$name" --value "$(cat "$src")" >/dev/null
+  echo "Uploaded $name"
+}
+
 for name in "${!SECRET_TO_PATH[@]}"; do
   dest=${SECRET_TO_PATH[$name]}
   if [ "$UPLOAD_ONLY" -eq 1 ]; then
@@ -189,5 +263,10 @@ for name in "${!SECRET_TO_PATH[@]}"; do
     fi
   fi
 done
+
+# Run Azure setup if requested
+if [ "$AZURE_SETUP" -eq 1 ]; then
+  setup_azure_prerequisites
+fi
 
 echo "Done."
