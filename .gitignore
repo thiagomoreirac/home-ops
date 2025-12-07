@@ -1,14 +1,21 @@
-.private/
-.pytest_cache/
-.task/
-.venv/
-*.crt
-*.env
-*.iso
+# Secrets
+*.pub
 *.key
-.decrypted~*
-.DS_Store
-Brewfile.lock.json
-Thumbs.db
+*.decrypted~*.yaml
+/age.key
+/cloudflare-tunnel.json
+/github-deploy.key
+/github-deploy.key.pub
+/github-push-token.txt
+# Template config files
+/cluster.yaml
+/nodes.yaml
+# Kubernetes
 kubeconfig
 talosconfig
+# Misc.
+.private/
+.task/
+.venv/
+.DS_Store
+Thumbs.db
