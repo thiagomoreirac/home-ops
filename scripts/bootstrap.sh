@@ -1,0 +1,146 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# bootstrap.sh
+# Fetch or upload secrets to Azure Key Vault and write them to local paths.
+# Supports interactive SSO via `az login`.
+
+VAULT=""
+UPLOAD=0
+FORCE=0
+
+usage() {
+  cat <<EOF
+Usage: $0 --vault VAULT_NAME [--fetch-only] [--upload] [--force]
+
+Options:
+  --vault NAME     Name of the existing Azure Key Vault to use (required).
+  --upload         Upload local files to Key Vault when missing.
+  --force          Overwrite local files even if they exist.
+  --help           Show this help.
+
+This script will fetch the following secrets from Key Vault (if present):
+  - age-private-key          -> ~/.config/sops/age/keys.txt
+  - kubeconfig               -> ~/.kube/config
+  - github-deploy-key        -> ~/.ssh/github-deploy.key
+  - github-deploy-key-pub    -> ~/.ssh/github-deploy.key.pub
+  - github-push-token        -> ~/.config/home-ops/github-push-token.txt
+  - cloudflare-tunnel        -> ~/.cloudflared/tunnel.json
+  - cluster-yaml             -> ./cluster.yaml
+  - nodes-yaml               -> ./nodes.yaml
+
+Use --upload to push existing local files to Key Vault using the secret names above.
+EOF
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --vault) VAULT="$2"; shift 2;;
+    --upload) UPLOAD=1; shift;;
+    --force) FORCE=1; shift;;
+    --help) usage; exit 0;;
+    *) echo "Unknown arg: $1" >&2; usage; exit 1;;
+  esac
+done
+
+if [ -z "$VAULT" ]; then
+  echo "--vault is required" >&2
+  usage
+  exit 2
+fi
+
+command -v az >/dev/null 2>&1 || { echo "az CLI not found. Install the Azure CLI first." >&2; exit 3; }
+
+# Ensure we're logged in (interactive SSO will open browser when needed)
+if ! az account show >/dev/null 2>&1; then
+  echo "Not logged in to Azure. Opening browser to authenticate (SSO)..."
+  az login
+fi
+
+declare -A SECRET_TO_PATH
+SECRET_TO_PATH["age-private-key"]="$HOME/.config/sops/age/keys.txt"
+SECRET_TO_PATH["kubeconfig"]="$HOME/.kube/config"
+SECRET_TO_PATH["github-deploy-key"]="$HOME/.ssh/github-deploy.key"
+SECRET_TO_PATH["github-deploy-key-pub"]="$HOME/.ssh/github-deploy.key.pub"
+SECRET_TO_PATH["github-push-token"]="$HOME/.config/home-ops/github-push-token.txt"
+SECRET_TO_PATH["cloudflare-tunnel"]="$HOME/.cloudflared/tunnel.json"
+SECRET_TO_PATH["cluster-yaml"]="$PWD/cluster.yaml"
+SECRET_TO_PATH["nodes-yaml"]="$PWD/nodes.yaml"
+
+mkdir -p "$HOME/.config/sops/age"
+mkdir -p "$HOME/.ssh"
+mkdir -p "$HOME/.kube"
+mkdir -p "$HOME/.config/home-ops"
+mkdir -p "$HOME/.cloudflared"
+
+fetch_secret() {
+  local name="$1"
+  local dest="$2"
+
+  echo "Fetching secret '$name' from vault '$VAULT'..."
+  if az keyvault secret show --vault-name "$VAULT" --name "$name" --query value -o tsv >/tmp/kv_secret_value 2>/dev/null; then
+    mkdir -p "$(dirname "$dest")"
+    cat /tmp/kv_secret_value > "$dest"
+    if [[ "$name" == github-deploy-key || "$name" == age-private-key || "$name" == kubeconfig ]]; then
+      chmod 600 "$dest" || true
+    fi
+    echo "Wrote $dest"
+    rm -f /tmp/kv_secret_value
+    return 0
+  else
+    rm -f /tmp/kv_secret_value || true
+    echo "Secret '$name' not found in vault '$VAULT'"
+    return 1
+  fi
+}
+
+upload_secret() {
+  local name="$1"
+  local src="$2"
+
+  if [ ! -f "$src" ]; then
+    echo "Local file $src not found, skipping upload for $name"
+    return 1
+  fi
+  echo "Uploading local $src to vault '$VAULT' as secret '$name'..."
+  # Use az to set secret; multiline values are supported
+  az keyvault secret set --vault-name "$VAULT" --name "$name" --value "$(cat "$src")" >/dev/null
+  echo "Uploaded $name"
+}
+
+for name in "${!SECRET_TO_PATH[@]}"; do
+  dest=${SECRET_TO_PATH[$name]}
+  if fetch_secret "$name" "$dest"; then
+    continue
+  else
+    if [ "$UPLOAD" -eq 1 ]; then
+      # If secret missing in KV and local file exists, upload
+      if [ -f "$dest" ]; then
+        upload_secret "$name" "$dest"
+      else
+        # For age key specifically, create a new one and upload it
+        if [ "$name" = "age-private-key" ]; then
+          echo "No age key locally. Generating new age key pair..."
+          mkdir -p "$(dirname "$dest")"
+          # requires age (age-keygen) or using openssl as fallback
+          if command -v age-keygen >/dev/null 2>&1; then
+            age-keygen -o "$dest"
+            chmod 600 "$dest"
+            upload_secret "$name" "$dest"
+          else
+            echo "age-keygen not found. Generating a simple keypair via openssl as fallback. Please install 'age' for a proper age keypair." >&2
+            openssl genpkey -algorithm RSA -out "$dest" -pkeyopt rsa_keygen_bits:4096
+            chmod 600 "$dest"
+            upload_secret "$name" "$dest"
+          fi
+        else
+          echo "Secret $name missing and no local file to upload. Skipping."
+        fi
+      fi
+    else
+      echo "Secret $name missing in vault and upload not enabled. Skipping."
+    fi
+  fi
+done
+
+echo "Done."
