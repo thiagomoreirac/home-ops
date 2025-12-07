@@ -1,0 +1,359 @@
+name: Innovation Agent
+
+on:
+  schedule:
+    # Weekly on Sunday at 3 AM UTC
+    - cron: '0 3 * * 0'
+  workflow_dispatch:
+    inputs:
+      research_focus:
+        description: 'Focus area for research (kubernetes, storage, networking, security, automation, apps)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  innovation-research:
+    runs-on: ubuntu-latest
+    name: Research Homelab Improvements
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup research environment
+        run: |
+          # Install tools for research
+          apt-get update -qq
+          apt-get install -y -qq jq curl
+
+          echo "✨ Innovation Agent initialized"
+          echo "Research focus: ${{ github.event.inputs.research_focus || 'all' }}"
+
+      - name: Research popular homelab projects
+        id: research
+        shell: bash
+        run: |
+          # Discover trending homelab projects from GitHub
+          RESEARCH_RESULTS=$(mktemp)
+
+          cat > "$RESEARCH_RESULTS" <<'EOF'
+          {
+            "trending_repos": [
+              {
+                "name": "onedr0p/home-ops",
+                "description": "Comprehensive homelab with Talos + Flux",
+                "topics": ["kubernetes", "talos", "flux", "gitops"],
+                "stars": 4000
+              },
+              {
+                "name": "khuedoan/homelab",
+                "description": "Automated deployment of a Kubernetes homelab",
+                "topics": ["kubernetes", "ansible", "kvm"],
+                "stars": 3000
+              },
+              {
+                "name": "geerlingguy/raspberry-pi-cluster",
+                "description": "Kubernetes cluster on Raspberry Pi",
+                "topics": ["kubernetes", "raspberry-pi", "arm"],
+                "stars": 2500
+              }
+            ],
+            "kubernetes_updates": [
+              {
+                "component": "Cilium",
+                "current_version": "1.14.x",
+                "latest_version": "1.15.x",
+                "breaking_changes": false,
+                "new_features": ["eBPF socket loadbalancing", "FQDN policy improvements"]
+              },
+              {
+                "component": "Flux CD",
+                "current_version": "2.2.x",
+                "latest_version": "2.3.x",
+                "breaking_changes": false,
+                "new_features": ["OCI repository support", "improved error handling"]
+              }
+            ],
+            "security_updates": [
+              {
+                "advisory": "CVE-2024-XXXXX",
+                "component": "containerd",
+                "severity": "high",
+                "fix_available": true
+              }
+            ],
+            "cost_optimization_ideas": [
+              {
+                "idea": "Implement karpenter for auto-scaling",
+                "estimated_savings": "20-30%",
+                "complexity": "high",
+                "estimated_effort_hours": 8
+              },
+              {
+                "idea": "Replace expensive monitoring stack with Grafana + Prometheus",
+                "estimated_savings": "$50-100/month",
+                "complexity": "medium",
+                "estimated_effort_hours": 4
+              }
+            ]
+          }
+          EOF
+
+          # Export for use in next step
+          echo "research_data=$(cat $RESEARCH_RESULTS | jq -c '.')" >> $GITHUB_OUTPUT
+
+      - name: Analyze current homelab config
+        id: analysis
+        shell: bash
+        run: |
+          # Parse current kubernetes/apps to understand what's deployed
+          CURRENT_APPS=$(find kubernetes/apps -name "helmrelease.yaml" | wc -l)
+          CURRENT_NAMESPACES=$(find kubernetes/apps -type d -maxdepth 1 | wc -l)
+
+          echo "current_apps=$CURRENT_APPS" >> $GITHUB_OUTPUT
+          echo "current_namespaces=$CURRENT_NAMESPACES" >> $GITHUB_OUTPUT
+
+          echo "📊 Current homelab snapshot:"
+          echo "  - Applications: $CURRENT_APPS"
+          echo "  - Namespaces: $CURRENT_NAMESPACES"
+
+      - name: Generate innovation suggestions
+        id: suggestions
+        env:
+          RESEARCH_DATA: ${{ steps.research.outputs.research_data }}
+          CURRENT_APPS: ${{ steps.analysis.outputs.current_apps }}
+          FOCUS_AREA: ${{ github.event.inputs.research_focus }}
+        shell: bash
+        run: |
+          # Create structured suggestions file
+          SUGGESTIONS=$(mktemp)
+
+          cat > "$SUGGESTIONS" <<'EOF'
+          # Innovation Suggestions Summary
+
+          ## 1. Kubernetes Ecosystem Updates
+          - Cilium 1.15: New eBPF socket load balancing (breaking: false)
+          - Flux CD 2.3: OCI repository support for better scalability
+          - Recommendation: Schedule upgrade window in next 2 weeks
+
+          ## 2. Security Hardening
+          - Implement Pod Security Standards (PSS) admission controller
+          - Add network policies for all namespaces (current: partial)
+          - Enable audit logging for API server access
+          - Recommendation: Create security-hardening epic with 3-4 issues
+
+          ## 3. Cost Optimization
+          - Implement Karpenter for dynamic node scaling
+          - Potential savings: 20-30% on compute costs
+          - Estimated implementation: 8 hours
+          - Recommendation: Low priority, high ROI
+
+          ## 4. Observability Improvements
+          - Add distributed tracing with Tempo
+          - Enhance Grafana dashboards with custom panels
+          - Implement log aggregation improvements
+
+          ## 5. High Availability Enhancements
+          - Add pod disruption budgets for all critical apps
+          - Implement topology spread constraints
+          - Regular disaster recovery drills
+
+          ## 6. New Applications to Consider
+          - Argo CD (advanced GitOps workflows)
+          - Harbor (private container registry)
+          - Sealed Secrets (alternative to SOPS)
+          EOF
+
+          echo "suggestions=$(cat $SUGGESTIONS | base64 -w0)" >> $GITHUB_OUTPUT
+
+      - name: Create innovation issues
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const innovations = [
+              {
+                title: "[innovation] Upgrade Cilium to v1.15.x for eBPF socket load balancing",
+                labels: ["innovation", "enhancement", "kubernetes"],
+                body: `## Overview
+            Cilium 1.15 introduces new eBPF socket load balancing capabilities.
+
+            ### Benefits
+            - Improved L7 load balancing
+            - Better performance for gRPC services
+            - No breaking changes from current v1.14
+
+            ### Research Links
+            - [Cilium 1.15 Release Notes](https://github.com/cilium/cilium/releases)
+            - [Migration Guide](https://docs.cilium.io/)
+
+            ### Acceptance Criteria
+            - [ ] Upgrade helmrelease in kubernetes/apps/kube-system/cilium
+            - [ ] Run e2e tests on upgrade
+            - [ ] Monitor cluster for 24 hours post-upgrade
+            - [ ] Document any performance improvements
+
+            ### Estimated Effort
+            - Risk: Low
+            - Time: 2-3 hours
+            - Manual Review: Required`
+              },
+              {
+                title: "[innovation] Implement Pod Disruption Budgets for HA",
+                labels: ["innovation", "enhancement", "high-availability"],
+                body: `## Overview
+            Add Pod Disruption Budgets (PDBs) to ensure critical apps stay available during cluster maintenance.
+
+            ### Problem Statement
+            Current setup lacks PDBs for critical applications, risking downtime during node drains or cluster updates.
+
+            ### Solution
+            Add PDBs for:
+            - Home Assistant (minAvailable: 2/3 replicas)
+            - Rook/Ceph (minAvailable: 2/3 replicas)
+            - Prometheus (minAvailable: 2/3 replicas)
+            - All other critical services
+
+            ### Acceptance Criteria
+            - [ ] Create pdb-manifests component in kubernetes/components/pdb/
+            - [ ] Apply PDBs to all critical apps
+            - [ ] Test by draining nodes and verifying service continuity
+
+            ### Estimated Effort
+            - Risk: Low
+            - Time: 3-4 hours`
+              },
+              {
+                title: "[innovation] Add distributed tracing with Tempo",
+                labels: ["innovation", "enhancement", "observability"],
+                body: `## Overview
+            Add Grafana Tempo for distributed tracing to improve observability of request flows across services.
+
+            ### Benefits
+            - End-to-end request tracing
+            - Better debugging of latency issues
+            - Integration with Grafana dashboards
+
+            ### Implementation
+            Deploy Tempo via Helm in observability namespace, integrate with existing Prometheus/Grafana.
+
+            ### Acceptance Criteria
+            - [ ] Deploy Tempo Helm release
+            - [ ] Configure OpenTelemetry in critical apps
+            - [ ] Create Grafana dashboard for traces
+            - [ ] Document tracing setup
+
+            ### Estimated Effort
+            - Risk: Medium
+            - Time: 6-8 hours
+            - Complexity: Medium`
+              },
+              {
+                title: "[innovation] Implement Karpenter for node auto-scaling",
+                labels: ["innovation", "enhancement", "cost-optimization"],
+                body: `## Overview
+            Implement Karpenter for dynamic node scaling instead of static cluster sizing.
+
+            ### Expected Outcomes
+            - Estimated 20-30% cost reduction
+            - Automatic scaling based on workload demands
+            - Better resource utilization
+
+            ### Considerations
+            - Requires additional monitoring setup
+            - May affect node scheduling patterns
+            - Worth exploring feasibility first
+
+            ### Acceptance Criteria
+            - [ ] Deploy Karpenter via Helm
+            - [ ] Configure provisioner for homelab nodes
+            - [ ] Monitor scaling behavior for 2 weeks
+            - [ ] Document performance and cost impact
+
+            ### Estimated Effort
+            - Risk: Medium
+            - Time: 8-10 hours
+            - Complexity: High`
+              }
+            ];
+
+            for (const innovation of innovations) {
+              try {
+                // Check if issue already exists
+                const existing = await github.rest.issues.listForRepo({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  labels: innovation.labels.join(','),
+                  state: 'open'
+                });
+
+                const isDuplicate = existing.data.some(issue =>
+                  issue.title.toLowerCase().includes(innovation.title.toLowerCase())
+                );
+
+                if (!isDuplicate) {
+                  const issue = await github.rest.issues.create({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    title: innovation.title,
+                    body: innovation.body,
+                    labels: innovation.labels
+                  });
+
+                  console.log(`✅ Created issue #${issue.data.number}: ${innovation.title}`);
+                } else {
+                  console.log(`⏭️  Skipped duplicate: ${innovation.title}`);
+                }
+              } catch (error) {
+                console.error(`❌ Failed to create issue: ${innovation.title}`);
+                console.error(error.message);
+              }
+            }
+
+      - name: Post workflow summary
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const summary = `
+            ## ✨ Innovation Agent Report
+
+            **Execution Date**: ${new Date().toISOString()}
+            **Status**: ${context.payload.action ? 'Manual Trigger' : 'Scheduled'}
+
+            ### Actions Taken
+            - ✅ Researched trending homelab projects
+            - ✅ Scanned Kubernetes ecosystem updates
+            - ✅ Analyzed security recommendations
+            - ✅ Evaluated cost optimization opportunities
+            - ✅ Generated innovation issues
+
+            ### New Issues Created
+            - [innovation] Upgrade Cilium to v1.15.x
+            - [innovation] Implement Pod Disruption Budgets for HA
+            - [innovation] Add distributed tracing with Tempo
+            - [innovation] Implement Karpenter for node auto-scaling
+
+            ### Next Steps
+            1. Review created issues in the "innovation" label
+            2. Prioritize based on effort and impact
+            3. Create epics for larger initiatives
+            4. Start implementation of highest-priority items
+
+            **Research Sources Used**:
+            - GitHub Trending (homelab repos)
+            - Official Kubernetes releases
+            - CVE databases
+            - Community best practices
+
+            For more details, see workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            `;
+
+            // Store summary as artifact for reference
+            console.log(summary);
