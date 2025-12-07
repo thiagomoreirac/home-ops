@@ -28,3 +28,40 @@ tasks:
       - test -f {{.ROOT_DIR}}/.sops.yaml
       - test -f {{.SCRIPTS_DIR}}/bootstrap-apps.sh
       - test -f {{.SOPS_AGE_KEY_FILE}}
+
+  keyvault:
+    desc: Fetch secrets from Azure Key Vault or generate locally
+    prompt: 'This will use Azure CLI SSO to access Key Vault. Continue?'
+    cmds:
+      - |
+        set -euo pipefail
+        if [ "{{.USE_KEYVAULT}}" = "true" ]; then
+          UPLOAD_FLAG=""
+          if [ "{{.UPLOAD}}" = "true" ]; then
+            UPLOAD_FLAG=--upload
+          fi
+          if [ -n "{{.VAULT_URI}}" ]; then
+            UPLOAD_ONLY_FLAG=""
+            if [ "{{.UPLOAD_ONLY}}" = "true" ]; then
+              UPLOAD_ONLY_FLAG=--upload-only
+            fi
+            bash {{.SCRIPTS_DIR}}/bootstrap.sh --vault-uri "{{.VAULT_URI}}" $UPLOAD_FLAG $UPLOAD_ONLY_FLAG --subscription "{{.VAULT_SUBSCRIPTION}}"
+          else
+            CMD=(bash {{.SCRIPTS_DIR}}/bootstrap.sh --vault "{{.VAULT_NAME}}")
+            if [ -n "{{.VAULT_RG}}" ]; then
+              CMD+=(--vault-rg "{{.VAULT_RG}}")
+            fi
+            if [ -n "{{.VAULT_SUBSCRIPTION}}" ]; then
+              CMD+=(--subscription "{{.VAULT_SUBSCRIPTION}}")
+            fi
+            UPLOAD_ONLY_FLAG=""
+            if [ "{{.UPLOAD_ONLY}}" = "true" ]; then
+              UPLOAD_ONLY_FLAG=--upload-only
+            fi
+            CMD+=("$UPLOAD_FLAG")
+            CMD+=("$UPLOAD_ONLY_FLAG")
+            "${CMD[@]}"
+          fi
+        else
+          task template:generate-age-key
+        fi

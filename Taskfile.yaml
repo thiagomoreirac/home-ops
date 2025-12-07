@@ -11,6 +11,13 @@ vars:
   TALOS_DIR: '{{.ROOT_DIR}}/talos'
   PRIVATE_DIR: '{{.ROOT_DIR}}/.private'
   TALOSCONFIG: '{{.ROOT_DIR}}/talos/clusterconfig/talosconfig'
+  VAULT_NAME: ''
+  USE_KEYVAULT: 'false'
+  UPLOAD: 'false'
+  VAULT_RG: ''
+  VAULT_SUBSCRIPTION: ''
+  VAULT_URI: ''
+  UPLOAD_ONLY: 'false'
 
 env:
   KUBECONFIG: '{{.ROOT_DIR}}/kubeconfig'

@@ -35,6 +35,51 @@ tasks:
     preconditions:
       - which age-keygen
 
+  keyvault:
+    desc: Fetch age key from Key Vault or generate locally
+    prompt: 'Choose whether to retrieve the age key from Key Vault or generate it locally.'
+    cmds:
+      - |
+        set -euo pipefail
+        if [ "{{.USE_KEYVAULT}}" = "true" ]; then
+          if [ -z "{{.VAULT_NAME}}" ]; then
+            echo "VAULT_NAME is required when USE_KEYVAULT=true" >&2
+            exit 2
+          fi
+          UPLOAD_FLAG=""
+          if [ "{{.UPLOAD}}" = "true" ]; then
+            UPLOAD_FLAG=--upload
+          fi
+          # Prefer a full VAULT_URI if provided (e.g. https://myvault.vault.azure.net or resource id)
+          if [ -n "{{.VAULT_URI}}" ]; then
+            UPLOAD_ONLY_FLAG=""
+            if [ "{{.UPLOAD_ONLY}}" = "true" ]; then
+              UPLOAD_ONLY_FLAG=--upload-only
+            fi
+            bash {{.SCRIPTS_DIR}}/bootstrap.sh --vault-uri "{{.VAULT_URI}}" $UPLOAD_FLAG $UPLOAD_ONLY_FLAG --subscription "{{.VAULT_SUBSCRIPTION}}"
+          else
+            CMD=(bash {{.SCRIPTS_DIR}}/bootstrap.sh --vault "{{.VAULT_NAME}}")
+            if [ -n "{{.VAULT_RG}}" ]; then
+              CMD+=(--vault-rg "{{.VAULT_RG}}")
+            fi
+            if [ -n "{{.VAULT_SUBSCRIPTION}}" ]; then
+              CMD+=(--subscription "{{.VAULT_SUBSCRIPTION}}")
+            fi
+            UPLOAD_ONLY_FLAG=""
+            if [ "{{.UPLOAD_ONLY}}" = "true" ]; then
+              UPLOAD_ONLY_FLAG=--upload-only
+            fi
+            CMD+=("$UPLOAD_FLAG")
+            CMD+=("$UPLOAD_ONLY_FLAG")
+            # shellcheck disable=SC2068
+            "${CMD[@]}"
+          fi
+        else
+          # Generate the age key using the template task
+          task template:generate-age-key
+        fi
+
+
   generate-deploy-key:
     internal: true
     cmd: ssh-keygen -t ed25519 -C "deploy-key" -f {{.ROOT_DIR}}/github-deploy.key -q -P ""

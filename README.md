@@ -1,3 +1,168 @@
+````markdown
+<div align="center">
+
+<img src="https://github.com/user-attachments/assets/cba21e9d-1275-4c92-ab9b-365f31f35add" align="center" width="175px" height="175px"/>
+
+### <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f680/512.gif" alt="🚀" width="16" height="16"> My Home Operations Repository <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f6a7/512.gif" alt="🚧" width="16" height="16">
+
+_... managed with Flux, Renovate, and GitHub Actions_ <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f916/512.gif" alt="🤖" width="16" height="16">
+
+</div>
+
+<div align="center">
+
+[![Discord](https://img.shields.io/discord/673534664354430999?style=for-the-badge&label&logo=discord&logoColor=white&color=blue)](https://discord.gg/home-operations)&nbsp;&nbsp;
+[![Talos](https://img.shields.io/endpoint?url=https%3A%2F%2Fkromgo.turbo.ac%2Ftalos_version&style=for-the-badge&logo=talos&logoColor=white&color=blue&label=%20)](https://talos.dev)&nbsp;&nbsp;
+[![Kubernetes](https://img.shields.io/endpoint?url=https%3A%2F%2Fkromgo.turbo.ac%2Fkubernetes_version&style=for-the-badge&logo=kubernetes&logoColor=white&color=blue&label=%20)](https://kubernetes.io)&nbsp;&nbsp;
+[![Flux](https://img.shields.io/endpoint?url=https%3A%2F%2Fkromgo.turbo.ac%2Fflux_version&style=for-the-badge&logo=flux&logoColor=white&color=blue&label=%20)](https://fluxcd.io)&nbsp;&nbsp;
+[![Renovate](https://img.shields.io/github/actions/workflow/status/onedr0p/home-ops/renovate.yaml?branch=main&label=&logo=renovatebot&style=for-the-badge&color=blue)](https://github.com/onedr0p/home-ops/actions/workflows/renovate.yaml)
+
+</div>
+
+---
+
+## <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f4a1/512.gif" alt="💡" width="20" height="20"> Overview
+
+This is a mono repository for my home infrastructure and Kubernetes cluster. I try to adhere to Infrastructure as Code (IaC) and GitOps practices using tools like [Ansible](https://www.ansible.com/), [Terraform](https://www.terraform.io/), [Kubernetes](https://kubernetes.io/), [Flux](https://github.com/fluxcd/flux2), [Renovate](https://github.com/renovatebot/renovate), and [GitHub Actions](https://github.com/features/actions).
+
+---
+
+## <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f331/512.gif" alt="🌱" width="20" height="20"> Kubernetes
+
+My Kubernetes cluster is deployed with [Talos](https://www.talos.dev). This is a semi-hyper-converged cluster, workloads and block storage are sharing the same available resources on my nodes while I have a separate server with ZFS for NFS/SMB shares, bulk file storage and backups.
+
+There is a template over at [onedr0p/cluster-template](https://github.com/onedr0p/cluster-template) if you want to try and follow along with some of the practices I use here.
+
+---
+
+## **Azure Key Vault (optional): Sync secrets for bootstrap**
+
+- **Purpose**: Store local, machine-specific secrets in Azure Key Vault so you don't have to re-create `age` keys or other sensitive files each time you use a new machine.
+
+- **Prerequisites**:
+  - An existing Azure Key Vault (you must create this separately).
+  - [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) installed and available as `az`.
+  - Your user identity must have `get`/`list`/`set` permissions for secrets in the Key Vault (or an appropriate RBAC role).
+
+- **What this repo provides**:
+  - `scripts/bootstrap.sh` — a small script that fetches secrets from Key Vault and writes them to local paths (or optionally uploads local files to Key Vault).
+  - Taskfile targets in `.taskfiles/` — `template:keyvault` and `bootstrap:keyvault` which call the script or the generation task based on variables.
+
+### Files synced with Key Vault by default
+
+The script will look for these secret names in Key Vault and write them to the following local paths:
+
+- `age-private-key`  -> `~/.config/sops/age/keys.txt`
+- `kubeconfig`       -> `~/.kube/config`
+- `github-deploy-key`-> `~/.ssh/github-deploy.key`
+- `github-deploy-key-pub` -> `~/.ssh/github-deploy.key.pub`
+- `github-push-token`-> `~/.config/home-ops/github-push-token.txt`
+- `cloudflare-tunnel`-> `~/.cloudflared/tunnel.json`
+- `cluster-yaml`     -> `./cluster.yaml` (repo root)
+- `nodes-yaml`       -> `./nodes.yaml` (repo root)
+
+These names are defaults in the script; you can adapt the script if you prefer different secret names or destinations.
+
+### Usage (interactive SSO)
+
+1. Ensure `az` is installed.
+2. Run interactive login (SSO):
+
+```bash
+az login
+```
+
+3. Fetch secrets from Key Vault (replace `MY-VAULT`):
+
+```bash
+bash scripts/bootstrap.sh --vault MY-VAULT
+```
+
+4. To upload local files to Key Vault (for example, push your local `age` key up to the vault), use the `--upload` flag:
+
+```bash
+bash scripts/bootstrap.sh --vault MY-VAULT --upload
+```
+
+Note: If an `age` private key is missing locally and you run with `--upload`, the script will attempt to create an `age`-style keypair using `age-keygen` (if available). If `age-keygen` is not installed the script falls back to generating an RSA key with `openssl` (install `age` for proper age keypairs).
+
+### Taskfile variables & usage
+
+To centralize configuration, this repository adds three Taskfile variables at the root `Taskfile.yaml`:
+
+- `VAULT_NAME` — name of the Azure Key Vault to use (empty by default)
+- `USE_KEYVAULT` — `'true'` or `'false'` (string) to decide whether to fetch secrets from Key Vault or to generate locally
+- `UPLOAD` — `'true'` or `'false'` (string) to enable uploading local files into the Key Vault when missing
+
+Additionally you can disambiguate the Key Vault by specifying the resource group and subscription where it lives:
+
+- `VAULT_RG` — resource group name containing the Key Vault (optional)
+- `VAULT_SUBSCRIPTION` — subscription id or name to target (optional)
+ - `VAULT_URI` — optional full vault URI (e.g. `https://myvault.vault.azure.net`) or resource id; when set this is preferred over `VAULT_NAME`.
+ - `UPLOAD_ONLY` — `'true'` or `'false'` to upload existing local secrets to Key Vault and exit (no generation).
+
+These are declared in the root `vars` so included Taskfiles inherit them. Example usages:
+
+- Fetch secrets (interactive SSO):
+
+```bash
+VAULT_NAME=my-vault USE_KEYVAULT=true VAULT_RG=my-rg VAULT_SUBSCRIPTION=00000000-0000-0000-0000-000000000000 task template:keyvault
+```
+
+- Fetch and upload any local missing secrets to the vault:
+
+```bash
+VAULT_NAME=my-vault USE_KEYVAULT=true VAULT_RG=my-rg VAULT_SUBSCRIPTION=00000000-0000-0000-0000-000000000000 UPLOAD=true task template:keyvault
+```
+
+### Upload existing local secrets only
+
+If you already have credentials/keys locally and want to push them into Key Vault without generating new keys, use `UPLOAD_ONLY=true`:
+
+```bash
+VAULT_NAME=my-vault VAULT_RG=my-rg VAULT_SUBSCRIPTION=00000000-0000-0000-0000-000000000000 UPLOAD_ONLY=true task template:keyvault
+```
+
+- Generate the `age` key locally using the included `generate-age-key` task (no Key Vault):
+
+```bash
+USE_KEYVAULT=false task template:keyvault
+```
+
+Notes:
+- Use the `template:keyvault` task when you need to initialize templated files (it calls the template-scoped `generate-age-key` if not using Key Vault).
+- The `bootstrap:keyvault` task in `.taskfiles/bootstrap` is available for bootstrap flows that expect the script to manage multiple runtime files (kubeconfig, cloudflared, etc.).
+
+### Example using `task` (if you use the `task` runner)
+
+```bash
+task bootstrap:keyvault VAULT_NAME=MY-VAULT
+# or to upload local files
+task bootstrap:keyvault VAULT_NAME=MY-VAULT UPLOAD=true
+```
+
+### CI / GitHub Actions
+
+In CI, use an Azure service principal (or managed identity in hosted runners) with permission to `get` secrets from the vault. Example step to fetch a secret and write to the sops path:
+
+```yaml
+- uses: azure/login@v2
+  with:
+    creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+- name: Download age key from Key Vault
+  run: |
+    az keyvault secret show --vault-name my-homeops-kv --name age-private-key --query value -o tsv > $HOME/.config/sops/age/keys.txt
+    chmod 600 $HOME/.config/sops/age/keys.txt
+```
+
+### Security notes
+
+- Keep Key Vault access limited to necessary principals.
+- Use Key Vault's logging and monitoring to audit access.
+- Do not store non-secret large state files (e.g., Terraform state) in Key Vault — use appropriate storage (Azure Storage) instead.
+
+````
 <<<<<<< HEAD
 ````markdown
 <div align="center">

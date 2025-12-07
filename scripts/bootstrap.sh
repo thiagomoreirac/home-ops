@@ -6,7 +6,10 @@ set -euo pipefail
 # Supports interactive SSO via `az login`.
 
 VAULT=""
+VAULT_RG=""
+SUBSCRIPTION=""
 UPLOAD=0
+UPLOAD_ONLY=0
 FORCE=0
 
 usage() {
@@ -16,7 +19,10 @@ Usage: $0 --vault VAULT_NAME [--fetch-only] [--upload] [--force]
 Options:
   --vault NAME     Name of the existing Azure Key Vault to use (required).
   --upload         Upload local files to Key Vault when missing.
+  --upload-only    Upload existing local files to Key Vault and exit (do not generate missing keys).
   --force          Overwrite local files even if they exist.
+  --vault-rg NAME   (optional) Resource group containing the Key Vault.
+  --subscription ID (optional) Azure subscription id to target the Key Vault.
   --help           Show this help.
 
 This script will fetch the following secrets from Key Vault (if present):
@@ -36,7 +42,10 @@ EOF
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --vault) VAULT="$2"; shift 2;;
+    --vault-rg|--vault-resource-group) VAULT_RG="$2"; shift 2;;
+    --subscription) SUBSCRIPTION="$2"; shift 2;;
     --upload) UPLOAD=1; shift;;
+    --upload-only) UPLOAD_ONLY=1; shift;;
     --force) FORCE=1; shift;;
     --help) usage; exit 0;;
     *) echo "Unknown arg: $1" >&2; usage; exit 1;;
@@ -55,6 +64,34 @@ command -v az >/dev/null 2>&1 || { echo "az CLI not found. Install the Azure CLI
 if ! az account show >/dev/null 2>&1; then
   echo "Not logged in to Azure. Opening browser to authenticate (SSO)..."
   az login
+fi
+
+# Resolve the vault to ensure uniqueness (use resource group/subscription if provided)
+AZ_ARGS=()
+if [ -n "$SUBSCRIPTION" ]; then
+  AZ_ARGS+=("--subscription" "$SUBSCRIPTION")
+fi
+
+if [ -n "$VAULT_RG" ]; then
+  # Confirm the vault exists in the specified resource group
+  if ! az keyvault show --name "$VAULT" --resource-group "$VAULT_RG" "${AZ_ARGS[@]}" >/dev/null 2>&1; then
+    echo "Key Vault '$VAULT' not found in resource group '$VAULT_RG' (subscription: '${SUBSCRIPTION:-current}')." >&2
+    exit 4
+  fi
+else
+  # If resource group not given, try to find the vault; using subscription helps ensure uniqueness
+  if [ -n "$SUBSCRIPTION" ]; then
+    if ! az keyvault show --name "$VAULT" "${AZ_ARGS[@]}" >/dev/null 2>&1; then
+      echo "Key Vault '$VAULT' not found in subscription '$SUBSCRIPTION'." >&2
+      exit 4
+    fi
+  else
+    # Best-effort check
+    if ! az keyvault show --name "$VAULT" >/dev/null 2>&1; then
+      echo "Key Vault '$VAULT' not found in the current subscription/context. Provide --vault-rg or --subscription to disambiguate." >&2
+      exit 4
+    fi
+  fi
 fi
 
 declare -A SECRET_TO_PATH
@@ -110,6 +147,16 @@ upload_secret() {
 
 for name in "${!SECRET_TO_PATH[@]}"; do
   dest=${SECRET_TO_PATH[$name]}
+  if [ "$UPLOAD_ONLY" -eq 1 ]; then
+    # Upload-only mode: upload existing local files and skip generation
+    if [ -f "$dest" ]; then
+      upload_secret "$name" "$dest"
+    else
+      echo "Local file $dest not found, skipping upload for $name"
+    fi
+    continue
+  fi
+
   if fetch_secret "$name" "$dest"; then
     continue
   else
