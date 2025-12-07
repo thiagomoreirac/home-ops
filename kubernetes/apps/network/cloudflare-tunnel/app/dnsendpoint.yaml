@@ -1,12 +1,10 @@
 ---
-# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/externaldns.k8s.io/dnsendpoint_v1alpha1.json
 apiVersion: externaldns.k8s.io/v1alpha1
 kind: DNSEndpoint
 metadata:
   name: cloudflare-tunnel
 spec:
   endpoints:
-    - dnsName: external.turbo.ac
+    - dnsName: "external.${SECRET_DOMAIN}"
       recordType: CNAME
-      targets:
-        - ${CLOUDFLARE_TUNNEL_ID}.cfargotunnel.com
+      targets: ["273506a0-d2ed-413d-ad3f-6151ca636dc6.cfargotunnel.com"]
