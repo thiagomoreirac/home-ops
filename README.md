@@ -7,99 +7,153 @@
 
 _... managed with Flux, Renovate, and GitHub Actions_ <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f916/512.gif" alt="🤖" width="16" height="16">
 
-</div>
+# home-ops
 
-<div align="center">
+<a href="https://github.com/thiagom/home-ops/actions/workflows/age-key-vault.yaml"><img src="https://github.com/thiagom/home-ops/actions/workflows/age-key-vault.yaml/badge.svg" alt="age-key-vault"></a>
 
-[![Discord](https://img.shields.io/discord/673534664354430999?style=for-the-badge&label&logo=discord&logoColor=white&color=blue)](https://discord.gg/home-operations)&nbsp;&nbsp;
-[![Talos](https://img.shields.io/endpoint?url=https%3A%2F%2Fkromgo.turbo.ac%2Ftalos_version&style=for-the-badge&logo=talos&logoColor=white&color=blue&label=%20)](https://talos.dev)&nbsp;&nbsp;
-[![Kubernetes](https://img.shields.io/endpoint?url=https%3A%2F%2Fkromgo.turbo.ac%2Fkubernetes_version&style=for-the-badge&logo=kubernetes&logoColor=white&color=blue&label=%20)](https://kubernetes.io)&nbsp;&nbsp;
-[![Flux](https://img.shields.io/endpoint?url=https%3A%2F%2Fkromgo.turbo.ac%2Fflux_version&style=for-the-badge&logo=flux&logoColor=white&color=blue&label=%20)](https://fluxcd.io)&nbsp;&nbsp;
-[![Renovate](https://img.shields.io/github/actions/workflow/status/onedr0p/home-ops/renovate.yaml?branch=main&label=&logo=renovatebot&style=for-the-badge&color=blue)](https://github.com/onedr0p/home-ops/actions/workflows/renovate.yaml)
+Consolidated tooling and configuration for bootstrapping and operating a personal Kubernetes/Talos homelab. This repository contains:
 
-</div>
+- Cluster and app manifests (kustomize overlays)
+- Talos machine templates and configuration
+- Helper scripts to bootstrap local developer machines and CI
+- Integration with `sops`/`age` for repository secrets and optional Azure Key Vault for local secret sync
 
----
+Quick navigation
 
-## <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f4a1/512.gif" alt="💡" width="20" height="20"> Overview
+- `bootstrap/` — repo bootstrap templates and supporting files
+- `kubernetes/` — kustomize overlays, components and environments
+- `talos/` — Talos configuration, machine templates and node definitions
+- `scripts/` — helper scripts (e.g., `scripts/bootstrap.sh`)
+- `Taskfile.yaml` — top-level Taskfile variables and task runner bindings
 
-This is a mono repository for my home infrastructure and Kubernetes cluster. I try to adhere to Infrastructure as Code (IaC) and GitOps practices using tools like [Ansible](https://www.ansible.com/), [Terraform](https://www.terraform.io/), [Kubernetes](https://kubernetes.io/), [Flux](https://github.com/fluxcd/flux2), [Renovate](https://github.com/renovatebot/renovate), and [GitHub Actions](https://github.com/features/actions).
+**Goals**
 
----
+- Make onboarding a new machine simple and idempotent
+- Avoid repeatedly re-creating local secrets (notably the `sops`/`age` key) by optionally fetching them from Azure Key Vault
+- Provide a predictable CLI (`task`) surface for developers and CI
 
-## <img src="https://fonts.gstatic.com/s/e/notoemoji/latest/1f331/512.gif" alt="🌱" width="20" height="20"> Kubernetes
+Prerequisites
 
-My Kubernetes cluster is deployed with [Talos](https://www.talos.dev). This is a semi-hyper-converged cluster, workloads and block storage are sharing the same available resources on my nodes while I have a separate server with ZFS for NFS/SMB shares, bulk file storage and backups.
+- Git checkout of this repo
+- Azure CLI (`az`) installed & configured for interactive SSO or service principal in CI
+- `task` (Taskfile) to run project tasks (optional; tasks can be run manually)
+- `sops` and `age` available for encryption operations when applicable
 
-There is a template over at [onedr0p/cluster-template](https://github.com/onedr0p/cluster-template) if you want to try and follow along with some of the practices I use here.
+Quickstart — developer machine (preferred: interactive SSO)
 
----
+1. Ensure you're logged in with Azure CLI (interactive SSO):
 
-## **Azure Key Vault (optional): Sync secrets for bootstrap**
+   ```bash
+   az account show || az login
+   ```
 
-- **Purpose**: Store local, machine-specific secrets in Azure Key Vault so you don't have to re-create `age` keys or other sensitive files each time you use a new machine.
+2. If you want to use Azure Key Vault for syncing local secrets, set the following `Taskfile` variables (or export env vars):
 
-- **Prerequisites**:
-  - An existing Azure Key Vault (you must create this separately).
-  - [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) installed and available as `az`.
-  - Your user identity must have `get`/`list`/`set` permissions for secrets in the Key Vault (or an appropriate RBAC role).
+   - `VAULT_NAME` — the target Key Vault name
+   - `VAULT_RG` — optional resource group to disambiguate vaults
+   - `VAULT_SUBSCRIPTION` — optional subscription ID for disambiguation
+   - `USE_KEYVAULT` — set to `true` to prefer vault-backed bootstrap
+   - `UPLOAD` — set to `true` to upload local files when the secret is missing in the vault
+   - `UPLOAD_ONLY` — set to `true` to only upload local files without attempting to fetch/generate
 
-- **What this repo provides**:
-  - `scripts/bootstrap.sh` — a small script that fetches secrets from Key Vault and writes them to local paths (or optionally uploads local files to Key Vault).
-  - Taskfile targets in `.taskfiles/` — `template:keyvault` and `bootstrap:keyvault` which call the script or the generation task based on variables.
+   Example (Bash):
 
-### Files synced with Key Vault by default
+   ```bash
+   export VAULT_NAME=my-home-ops-vault
+   export VAULT_RG=rg-home-ops
+   export USE_KEYVAULT=true
+   task template:keyvault
+   ```
 
-The script will look for these secret names in Key Vault and write them to the following local paths:
+3. The `task template:keyvault` (or `task bootstrap:keyvault`) task will call `scripts/bootstrap.sh` which:
 
-- `age-private-key`  -> `~/.config/sops/age/keys.txt`
-- `kubeconfig`       -> `~/.kube/config`
-- `github-deploy-key`-> `~/.ssh/github-deploy.key`
+- Validates Azure login and Key Vault existence
+- Fetches secrets from Key Vault into local well-known paths (age key, kubeconfig, ssh keys, cloudflared tunnel, cluster/nodes YAMLs, github push token)
+- Optionally uploads local secrets into Key Vault (migration mode)
+- Generates an `age` key locally when neither vault nor local key exists (using `age-keygen` or `openssl` fallback)
+
+Key Vault synced secret mapping (defaults used by `scripts/bootstrap.sh`)
+
+- `age-private-key` -> `~/.config/sops/age/keys.txt`
+- `kubeconfig` -> `~/.kube/config`
+- `github-deploy-key` -> `~/.ssh/github-deploy.key`
 - `github-deploy-key-pub` -> `~/.ssh/github-deploy.key.pub`
-- `github-push-token`-> `~/.config/home-ops/github-push-token.txt`
-- `cloudflare-tunnel`-> `~/.cloudflared/tunnel.json`
-- `cluster-yaml`     -> `./cluster.yaml` (repo root)
-- `nodes-yaml`       -> `./nodes.yaml` (repo root)
+- `github-push-token` -> `~/.config/home-ops/github-push-token.txt`
+- `cloudflare-tunnel` -> `~/.cloudflared/tunnel.json`
+- `cluster-yaml` -> `./cluster.yaml` (repo-local)
+- `nodes-yaml` -> `./nodes.yaml` (repo-local)
 
-These names are defaults in the script; you can adapt the script if you prefer different secret names or destinations.
+If you need additional mappings, modify `scripts/bootstrap.sh`'s `SECRET_TO_PATH` map.
 
-### Usage (interactive SSO)
+Upload-only (migrate local secrets into Key Vault)
 
-1. Ensure `az` is installed.
-2. Run interactive login (SSO):
-
-```bash
-az login
-```
-
-3. Fetch secrets from Key Vault (replace `MY-VAULT`):
+To migrate local keys into Key Vault without changing local files, run:
 
 ```bash
-bash scripts/bootstrap.sh --vault MY-VAULT
+task template:keyvault --upload-only
+# or
+./scripts/bootstrap.sh --vault "$VAULT_NAME" --upload-only
 ```
 
-4. To upload local files to Key Vault (for example, push your local `age` key up to the vault), use the `--upload` flag:
+CI / GitHub Actions
 
-```bash
-bash scripts/bootstrap.sh --vault MY-VAULT --upload
+The included workflow `.github/workflows/age-key-vault.yaml` demonstrates a pattern used here:
+
+- In CI, you may prefer to use a service principal via `azure/login` to fetch an `age` key from Key Vault into the runner, or instead run the repo's `task template:generate-age-key` step to create a one-off key.
+- The workflow input `use_keyvault` controls whether the workflow fetches from Key Vault or generates locally.
+
+Example action snippet (simplified):
+
+```yaml
+- uses: azure/login@v1
+  with:
+    creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+- name: Fetch age key from Key Vault
+  run: |
+    az keyvault secret download --file "$RUNNER_TEMP/age-keys.txt" --id "$VAULT_SECRET_ID"
+    mkdir -p ~/.config/sops/age
+    mv "$RUNNER_TEMP/age-keys.txt" ~/.config/sops/age/keys.txt
 ```
 
-Note: If an `age` private key is missing locally and you run with `--upload`, the script will attempt to create an `age`-style keypair using `age-keygen` (if available). If `age-keygen` is not installed the script falls back to generating an RSA key with `openssl` (install `age` for proper age keypairs).
+Taskfile variables & usage
 
-### Taskfile variables & usage
+The repo centralizes a few top-level variables in `Taskfile.yaml` that are inherited by included Taskfiles. The most important ones:
 
-To centralize configuration, this repository adds three Taskfile variables at the root `Taskfile.yaml`:
+- `VAULT_NAME` — Key Vault name (string)
+- `VAULT_RG` — Resource group for the Key Vault (optional)
+- `VAULT_SUBSCRIPTION` — Subscription ID (optional)
+- `VAULT_URI` — Full Key Vault URI (optional; when provided it will be preferred)
+- `USE_KEYVAULT` — `true`/`false` (default `false`) — whether Key Vault is used
+- `UPLOAD` — `true`/`false` — when `true`, the bootstrap script uploads local files to Key Vault if missing
+- `UPLOAD_ONLY` — `true`/`false` — when `true`, script uploads existing local files and exits
 
-- `VAULT_NAME` — name of the Azure Key Vault to use (empty by default)
-- `USE_KEYVAULT` — `'true'` or `'false'` (string) to decide whether to fetch secrets from Key Vault or to generate locally
-- `UPLOAD` — `'true'` or `'false'` (string) to enable uploading local files into the Key Vault when missing
+Tasks you will commonly use
 
-Additionally you can disambiguate the Key Vault by specifying the resource group and subscription where it lives:
+- `task template:keyvault` — Use Key Vault-backed bootstrap for template-gen flows (or fallback to local generation)
+- `task bootstrap:keyvault` — Use Key Vault-backed bootstrap for cluster/app bootstrap flows
+- `task template:generate-age-key` — Generate a local `age` keypair and write to the configured path
 
-- `VAULT_RG` — resource group name containing the Key Vault (optional)
-- `VAULT_SUBSCRIPTION` — subscription id or name to target (optional)
- - `VAULT_URI` — optional full vault URI (e.g. `https://myvault.vault.azure.net`) or resource id; when set this is preferred over `VAULT_NAME`.
- - `UPLOAD_ONLY` — `'true'` or `'false'` to upload existing local secrets to Key Vault and exit (no generation).
+Security & operational notes
+
+- Azure Key Vault stores secrets and provides access control — treat stored items as sensitive and rotate them as needed.
+- Do not check real secrets into Git. Use `sops` + `age` encrypted files for repository secrets and keep private `age` keys out of Git; prefer Key Vault for local secret sync.
+- The bootstrap script writes files into your home directory (e.g., `~/.config/sops/age/keys.txt`, `~/.ssh/...`). Confirm these paths are acceptable for your environment.
+- Consider adding the synced local paths to `.gitignore` if they're not already ignored.
+
+Where to look next
+
+- `scripts/bootstrap.sh` — main script orchestrating vault fetch/upload/generation
+- `.taskfiles/*/Taskfile.yaml` — included Taskfiles that call the bootstrap workflow
+- `.github/workflows/age-key-vault.yaml` — example CI workflow showing both vault and local generation options
+
+Contributions & Support
+
+Open an issue or PR if you find a bug or want a feature. If you'd like a PowerShell variant of the bootstrap script for Windows-only flows, open an issue and I can add `scripts/bootstrap.ps1`.
+
+License
+
+This repository contains my personal configuration; please open an issue for licensing questions related to contributions.
 
 These are declared in the root `vars` so included Taskfiles inherit them. Example usages:
 
